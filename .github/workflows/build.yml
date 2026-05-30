@@ -1,0 +1,48 @@
+# Project Astra — CI 自动构建（占位）
+# 待引擎确定后配置实际的构建流程
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---- Unity 构建示例 (取消注释后使用) ----
+  # build-unity:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         lfs: true
+  #     - uses: game-ci/unity-builder@v4
+  #       with:
+  #         targetPlatform: StandaloneWindows64
+  #         unityVersion: 2022.3.x
+
+  # ---- Unreal 构建示例 ----
+  # build-ue:
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         lfs: true
+  #     - run: |
+  #         # UE 构建命令（需要配置）
+
+  # ---- Godot 构建示例 ----
+  # build-godot:
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: barichello/godot-ci:4.2
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: godot --headless --export-release "Windows Desktop" build/windows/
+
+  # 占位任务（确保 workflow 不报错）
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CI 就绪，待引擎确定后配置构建步骤"

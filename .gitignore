@@ -1,0 +1,74 @@
+# ===========================================
+# Project Astra — .gitignore
+# ===========================================
+
+# --- 引擎生成文件（按你选择的引擎取消注释）---
+# Unity
+# [Ll]ibrary/
+# [Tt]emp/
+# [Oo]bj/
+# [Bb]uild/
+# [Bb]uilds/
+# *.csproj
+# *.unityproj
+# *.sln
+# *.userprefs
+
+# Unreal Engine
+# Binaries/
+# Intermediate/
+# Build/
+# DerivedDataCache/
+# Saved/
+# *.sln
+# *.xcodeproj
+
+# Godot
+# .import/
+# export/
+# *.translation
+
+# --- 系统文件 ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- IDE ---
+.idea/
+.vscode/
+*.sublime-*
+
+# --- 构建产物 ---
+dist/
+build/
+out/
+*.exe
+*.app
+*.apk
+*.ipa
+
+# --- 临时文件 ---
+*.tmp
+*.log
+*.bak
+*.orig
+
+# --- 依赖 ---
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- 数据 ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- 如果不用 LFS，把下面也忽略 ---
+# assets/models/*.fbx
+# assets/models/*.blend
+# assets/textures/*.psd
+# assets/textures/*.tga
