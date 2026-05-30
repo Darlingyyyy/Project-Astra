@@ -67,6 +67,9 @@ venv/
 *.sqlite
 *.sqlite3
 
+# --- SSH 密钥（本地）---
+.ssh/
+
 # --- 如果不用 LFS，把下面也忽略 ---
 # assets/models/*.fbx
 # assets/models/*.blend
