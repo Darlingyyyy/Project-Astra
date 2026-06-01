@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Astra — Prologue Greybox</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #0a0a0f; font-family: 'Segoe UI', system-ui, sans-serif; }
+    canvas { display: block; }
+
+    #hud {
+      position: fixed; inset: 0; pointer-events: none; z-index: 10;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+
+    #beat-display {
+      position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 8px 20px;
+      color: #ccc; font-size: 13px; letter-spacing: 0.5px;
+      transition: all 0.4s ease;
+    }
+    #beat-display .beat-name { color: #fff; font-weight: 600; }
+    #beat-display .beat-hint { color: #888; font-size: 11px; margin-top: 2px; }
+
+    #player-hud {
+      position: absolute; bottom: 32px; left: 32px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .stat-row { display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 12px; }
+    .stat-bar-bg {
+      width: 160px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;
+    }
+    .stat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+    .hp-fill { background: #4ade80; }
+    .sp-fill { background: #60a5fa; }
+
+    #boss-hud {
+      position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+      display: none; flex-direction: column; align-items: center; gap: 4px;
+    }
+    #boss-hud .boss-name { color: #f87171; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+    #boss-hud .boss-bar-bg {
+      width: 240px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;
+    }
+    #boss-hud .boss-bar-fill {
+      height: 100%; background: #ef4444; border-radius: 4px; transition: width 0.3s ease;
+    }
+
+    #controls-hint {
+      position: absolute; bottom: 32px; right: 32px;
+      color: #555; font-size: 11px; line-height: 1.6; text-align: right;
+    }
+    #controls-hint span { color: #888; }
+
+    #message-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      color: #fff; font-size: 18px; font-weight: 600; letter-spacing: 1px;
+      opacity: 0; transition: opacity 0.5s ease;
+      text-shadow: 0 0 20px rgba(255,255,255,0.3);
+    }
+
+    #crosshair {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 20px; height: 20px; pointer-events: none;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: rgba(255,255,255,0.3);
+    }
+    #crosshair::before { top: 9px; left: 0; width: 20px; height: 1px; }
+    #crosshair::after { left: 9px; top: 0; width: 1px; height: 20px; }
+
+    .fade-in { animation: fadeIn 1s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%,-50%) translateY(10px); } to { opacity: 1; transform: translate(-50%,-50%) translateY(0); } }
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="beat-display">
+    <div class="beat-name">Beat 0 · 开场：击退</div>
+    <div class="beat-hint">观察周围...</div>
+  </div>
+
+  <div id="boss-hud">
+    <div class="boss-name">黑暗神 · Dark God</div>
+    <div class="boss-bar-bg"><div class="boss-bar-fill" style="width:100%"></div></div>
+  </div>
+
+  <div id="player-hud">
+    <div class="stat-row">
+      <span>HP</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill hp-fill" style="width:100%"></div></div>
+    </div>
+    <div class="stat-row">
+      <span>SP</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill sp-fill" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <div id="message-center"></div>
+  <div id="crosshair"></div>
+
+  <div id="controls-hint">
+    <span>WASD</span> 移动 &nbsp; <span>鼠标</span> 视角<br>
+    <span>左键</span> 攻击 &nbsp; <span>右键</span> 锁定<br>
+    <span>Space</span> 闪避 &nbsp; <span>Q</span> 辉光斩 &nbsp; <span>E</span> 交互
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ─────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────
+const ARENA_RADIUS = 40;
+const PLAYER_SPEED = 8;
+const DODGE_SPEED = 22;
+const DODGE_DURATION = 0.25;
+const DODGE_COOLDOWN = 1.2;
+const ATTACK_RANGE = 3.5;
+const ATTACK_COOLDOWN = 0.5;
+const SKILL_COOLDOWN = 4.0;
+const SKILL_RANGE = 5.0;
+
+// ─────────────────────────────────────
+// DOM ELEMENTS
+// ─────────────────────────────────────
+const beatDisplay = document.getElementById('beat-display');
+const bossHud = document.getElementById('boss-hud');
+const messageCenter = document.getElementById('message-center');
+const hpFill = document.querySelector('.hp-fill');
+const spFill = document.querySelector('.sp-fill');
+const bossBarFill = document.querySelector('.boss-bar-fill');
+
+// ─────────────────────────────────────
+// SCENE SETUP
+// ─────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d0d18');
+scene.fog = new THREE.FogExp2('#0d0d18', 0.0006);
+
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 200);
+camera.position.set(0, 20, 35);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+document.body.appendChild(renderer.domElement);
+
+// ─────────────────────────────────────
+// LIGHTING
+// ─────────────────────────────────────
+const ambientLight = new THREE.AmbientLight('#334466', 0.6);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight('#eeddcc', 2.5);
+sunLight.position.set(30, 40, 20);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 120;
+sunLight.shadow.camera.left = -60;
+sunLight.shadow.camera.right = 60;
+sunLight.shadow.camera.top = 60;
+sunLight.shadow.camera.bottom = -60;
+sunLight.shadow.bias = -0.0001;
+scene.add(sunLight);
+
+const rimLight = new THREE.DirectionalLight('#8899cc', 0.8);
+rimLight.position.set(-20, 10, -15);
+scene.add(rimLight);
+
+// ─────────────────────────────────────
+// GROUND & ARENA
+// ─────────────────────────────────────
+const groundGeo = new THREE.PlaneGeometry(200, 200);
+const groundMat = new THREE.MeshStandardMaterial({ color: '#1a1a22', roughness: 0.95 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Arena disc
+const arenaGeo = new THREE.CylinderGeometry(ARENA_RADIUS, ARENA_RADIUS, 0.08, 64);
+const arenaMat = new THREE.MeshStandardMaterial({ color: '#2a2a35', roughness: 0.7 });
+const arena = new THREE.Mesh(arenaGeo, arenaMat);
+arena.position.y = 0.04;
+arena.receiveShadow = true;
+scene.add(arena);
+
+// Arena ring
+const ringGeo = new THREE.TorusGeometry(ARENA_RADIUS, 0.3, 16, 80);
+const ringMat = new THREE.MeshStandardMaterial({ color: '#444455', roughness: 0.5, metalness: 0.3 });
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.12;
+ring.receiveShadow = true;
+scene.add(ring);
+
+// Arena boundary pillars
+const pillarGeo = new THREE.CylinderGeometry(0.4, 0.5, 3, 8);
+const pillarMat = new THREE.MeshStandardMaterial({ color: '#3a3a44', roughness: 0.6 });
+for (let i = 0; i < 24; i++) {
+  const angle = (i / 24) * Math.PI * 2;
+  const px = Math.cos(angle) * (ARENA_RADIUS - 1);
+  const pz = Math.sin(angle) * (ARENA_RADIUS - 1);
+  const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+  pillar.position.set(px, 1.5, pz);
+  pillar.castShadow = true;
+  pillar.receiveShadow = true;
+  scene.add(pillar);
+
+  // Top cap on some pillars (ruined look)
+  if (i % 3 !== 0) {
+    const capGeo = new THREE.BoxGeometry(1.2, 0.3, 1.2);
+    const cap = new THREE.Mesh(capGeo, pillarMat);
+    cap.position.set(px, 3, pz);
+    cap.rotation.y = Math.random() * Math.PI;
+    cap.castShadow = true;
+    scene.add(cap);
+  }
+}
+
+// ─────────────────────────────────────
+// PLAYER
+// ─────────────────────────────────────
+const playerGroup = new THREE.Group();
+scene.add(playerGroup);
+
+// Body
+const bodyGeo = new THREE.BoxGeometry(0.7, 1.2, 0.5);
+const bodyMat = new THREE.MeshStandardMaterial({ color: '#4488cc', roughness: 0.4, metalness: 0.2 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.position.y = 1.0;
+body.castShadow = true;
+playerGroup.add(body);
+
+// Head
+const headGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+const headMat = new THREE.MeshStandardMaterial({ color: '#5599dd', roughness: 0.3, metalness: 0.1 });
+const head = new THREE.Mesh(headGeo, headMat);
+head.position.y = 1.85;
+head.castShadow = true;
+playerGroup.add(head);
+
+// Legs
+const legGeo = new THREE.BoxGeometry(0.25, 0.7, 0.25);
+const legMat = new THREE.MeshStandardMaterial({ color: '#335577', roughness: 0.5 });
+const legL = new THREE.Mesh(legGeo, legMat);
+legL.position.set(-0.18, 0.35, 0);
+legL.castShadow = true;
+playerGroup.add(legL);
+const legR = new THREE.Mesh(legGeo, legMat);
+legR.position.set(0.18, 0.35, 0);
+legR.castShadow = true;
+playerGroup.add(legR);
+
+// Sword (initially hidden — on the ground nearby)
+const swordGroup = new THREE.Group();
+const bladeGeo = new THREE.BoxGeometry(0.12, 1.4, 0.06);
+const bladeMat = new THREE.MeshStandardMaterial({ color: '#ffdd88', roughness: 0.2, metalness: 0.8, emissive: '#332200', emissiveIntensity: 0.5 });
+const blade = new THREE.Mesh(bladeGeo, bladeMat);
+blade.position.y = 0.7;
+blade.castShadow = true;
+swordGroup.add(blade);
+
+const guardGeo = new THREE.BoxGeometry(0.5, 0.12, 0.15);
+const guardMat = new THREE.MeshStandardMaterial({ color: '#aa8855', roughness: 0.3, metalness: 0.7 });
+const guard = new THREE.Mesh(guardGeo, guardMat);
+guard.castShadow = true;
+swordGroup.add(guard);
+
+const hiltGeo = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+const hilt = new THREE.Mesh(hiltGeo, guardMat);
+hilt.position.y = -0.3;
+hilt.castShadow = true;
+swordGroup.add(hilt);
+
+// Sword starts on the ground at player's starting position
+swordGroup.position.set(-5, 0.3, 3);
+swordGroup.rotation.z = -0.4;
+swordGroup.rotation.x = 0.3;
+scene.add(swordGroup);
+
+// Player start position (lying on ground - Beat 0 starts with player knocked down)
+playerGroup.position.set(-3, 0.5, 2);
+
+// ─────────────────────────────────────
+// DARK GOD (Boss placeholder)
+// ─────────────────────────────────────
+const bossGroup = new THREE.Group();
+scene.add(bossGroup);
+
+const bossBodyGeo = new THREE.CylinderGeometry(3, 4, 10, 8);
+const bossMat = new THREE.MeshStandardMaterial({ color: '#1a0a0a', roughness: 0.3, metalness: 0.5, emissive: '#110000', emissiveIntensity: 0.4 });
+const bossBody = new THREE.Mesh(bossBodyGeo, bossMat);
+bossBody.position.y = 5;
+bossBody.castShadow = true;
+bossGroup.add(bossBody);
+
+const bossHeadGeo = new THREE.SphereGeometry(2.2, 8, 6);
+const bossHead = new THREE.Mesh(bossHeadGeo, bossMat);
+bossHead.position.y = 10.5;
+bossHead.castShadow = true;
+bossGroup.add(bossHead);
+
+// Boss eyes
+const eyeGeo = new THREE.SphereGeometry(0.4, 8, 8);
+const eyeMat = new THREE.MeshStandardMaterial({ color: '#ff2200', roughness: 0.1, emissive: '#ff0000', emissiveIntensity: 2 });
+const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+eyeL.position.set(-0.7, 11.2, 1.6);
+bossGroup.add(eyeL);
+const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+eyeR.position.set(0.7, 11.2, 1.6);
+bossGroup.add(eyeR);
+
+// Boss aura ring
+const auraGeo = new THREE.TorusGeometry(4.5, 0.2, 8, 32);
+const auraMat = new THREE.MeshBasicMaterial({ color: '#330000', transparent: true, opacity: 0.4 });
+const aura = new THREE.Mesh(auraGeo, auraMat);
+aura.rotation.x = Math.PI / 2;
+aura.position.y = 0.3;
+bossGroup.add(aura);
+
+bossGroup.position.set(0, 0, 0);
+
+// ─────────────────────────────────────
+// ALLIES (Mage + Heroine — simple placeholders)
+// ─────────────────────────────────────
+function createAlly(color, x, z) {
+  const group = new THREE.Group();
+  const bGeo = new THREE.BoxGeometry(0.5, 1.0, 0.4);
+  const bMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
+  const b = new THREE.Mesh(bGeo, bMat);
+  b.position.y = 0.8;
+  b.castShadow = true;
+  group.add(b);
+  const hGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+  const h = new THREE.Mesh(hGeo, new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
+  h.position.y = 1.5;
+  h.castShadow = true;
+  group.add(h);
+  group.position.set(x, 0, z);
+  return group;
+}
+
+const mageGroup = createAlly('#8866cc', -5, 5);
+scene.add(mageGroup);
+const heroineGroup = createAlly('#cc88aa', -6, 4.5);
+scene.add(heroineGroup);
+
+// ─────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────
+const state = {
+  beat: 0,
+  playerHP: 100,
+  playerSP: 100,
+  playerMaxHP: 100,
+  playerMaxSP: 100,
+  hasSword: false,
+  isDodging: false,
+  dodgeTimer: 0,
+  dodgeCooldownTimer: 0,
+  attackTimer: 0,
+  skillTimer: 0,
+  isAttacking: false,
+  attackAnimTimer: 0,
+  bossHP: 200,
+  bossMaxHP: 200,
+  bossActive: false,
+  isLockedOn: false,
+  lockedTarget: null,
+  messageTimer: 0,
+  beatMessageShown: false,
+  enemiesDefeated: 0,
+};
+
+// ─────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────
+const keys = {};
+const mouse = { x: 0, y: 0, dx: 0, dy: 0, buttons: new Set() };
+
+window.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.code] = false; e.preventDefault(); });
+window.addEventListener('mousemove', e => { mouse.dx = e.movementX; mouse.dy = e.movementY; mouse.x += e.movementX; mouse.y += e.movementY; });
+window.addEventListener('mousedown', e => { mouse.buttons.add(e.button); });
+window.addEventListener('mouseup', e => { mouse.buttons.delete(e.button); });
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+document.addEventListener('click', () => {
+  renderer.domElement.requestPointerLock();
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─────────────────────────────────────
+// CAMERA
+// ─────────────────────────────────────
+let camTheta = 0;
+let camPhi = 0.5;
+let camDistance = 12;
+
+// ─────────────────────────────────────
+// ENEMIES
+// ─────────────────────────────────────
+const enemies = [];
+
+function spawnEnemy(x, z, type = 'minion') {
+  const group = new THREE.Group();
+  const bodyGeo = new THREE.BoxGeometry(0.8, 1.5, 0.6);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: type === 'heavy' ? '#553322' : '#332211', roughness: 0.5 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 1.0;
+  body.castShadow = true;
+  group.add(body);
+  const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.position.y = 2.0;
+  head.castShadow = true;
+  group.add(head);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+
+  const enemy = {
+    group,
+    type,
+    hp: type === 'heavy' ? 60 : 25,
+    maxHp: type === 'heavy' ? 60 : 25,
+    speed: type === 'heavy' ? 2.5 : 4,
+    damage: type === 'heavy' ? 15 : 8,
+    attackTimer: 0,
+    attackCooldown: type === 'heavy' ? 2.0 : 1.5,
+    alive: true,
+  };
+  enemies.push(enemy);
+  return enemy;
+}
+
+// ─────────────────────────────────────
+// COMBAT HELPERS
+// ─────────────────────────────────────
+function getPlayerForward() {
+  const dir = new THREE.Vector3();
+  playerGroup.getWorldDirection(dir);
+  return dir;
+}
+
+function dealDamageToEnemy(enemy, damage) {
+  enemy.hp -= damage;
+  if (enemy.hp <= 0) {
+    enemy.hp = 0;
+    enemy.alive = false;
+    enemy.group.visible = false;
+    state.enemiesDefeated++;
+    // Remove after delay
+    setTimeout(() => {
+      scene.remove(enemy.group);
+      const idx = enemies.indexOf(enemy);
+      if (idx > -1) enemies.splice(idx, 1);
+    }, 300);
+  }
+}
+
+function playerAttack() {
+  if (state.attackTimer > 0 || !state.hasSword) return;
+  state.attackTimer = ATTACK_COOLDOWN;
+  state.isAttacking = true;
+  state.attackAnimTimer = 0.3;
+
+  // Check enemies in range
+  const playerPos = playerGroup.position.clone();
+  const forward = getPlayerForward();
+
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    const toEnemy = enemy.group.position.clone().sub(playerPos);
+    toEnemy.y = 0;
+    const dist = toEnemy.length();
+    if (dist < ATTACK_RANGE) {
+      const dot = forward.dot(toEnemy.normalize());
+      if (dot > 0.2) {
+        dealDamageToEnemy(enemy, 15);
+      }
+    }
+  }
+}
+
+function playerSkill() {
+  if (state.skillTimer > 0 || state.playerSP < 30 || !state.hasSword) return;
+  state.skillTimer = SKILL_COOLDOWN;
+  state.playerSP -= 30;
+  state.isAttacking = true;
+  state.attackAnimTimer = 0.5;
+
+  const playerPos = playerGroup.position.clone();
+
+  // AoE around player
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    const dist = enemy.group.position.distanceTo(playerPos);
+    if (dist < SKILL_RANGE) {
+      dealDamageToEnemy(enemy, 35);
+    }
+  }
+
+  // Also hit boss
+  if (state.bossActive) {
+    const dist = bossGroup.position.distanceTo(playerPos);
+    if (dist < SKILL_RANGE + 2) {
+      state.bossHP -= 30;
+    }
+  }
+
+  // Flash effect
+  flashScreen('#ffffff', 0.15);
+
+  // Skill particles
+  spawnSkillParticles(playerPos);
+}
+
+function playerDodge() {
+  if (state.dodgeCooldownTimer > 0 || state.isDodging) return;
+  state.isDodging = true;
+  state.dodgeTimer = DODGE_DURATION;
+  state.dodgeCooldownTimer = DODGE_COOLDOWN;
+}
+
+// ─────────────────────────────────────
+// VFX
+// ─────────────────────────────────────
+const particles = [];
+
+function spawnSkillParticles(pos) {
+  for (let i = 0; i < 20; i++) {
+    const geo = new THREE.SphereGeometry(0.08, 4, 4);
+    const mat = new THREE.MeshBasicMaterial({ color: '#ffdd88' });
+    const particle = new THREE.Mesh(geo, mat);
+    particle.position.copy(pos);
+    particle.position.y += 1;
+    const vel = new THREE.Vector3(
+      (Math.random() - 0.5) * 4,
+      Math.random() * 3 + 1,
+      (Math.random() - 0.5) * 4
+    );
+    particle.userData = { vel, life: 1.0 };
+    scene.add(particle);
+    particles.push(particle);
+  }
+}
+
+function flashScreen(color, duration) {
+  const flash = document.createElement('div');
+  flash.style.cssText = `position:fixed;inset:0;background:${color};opacity:0.4;pointer-events:none;z-index:50;transition:opacity ${duration}s ease;`;
+  document.body.appendChild(flash);
+  requestAnimationFrame(() => { flash.style.opacity = '0'; });
+  setTimeout(() => flash.remove(), duration * 1000 + 100);
+}
+
+// ─────────────────────────────────────
+// MESSAGES
+// ─────────────────────────────────────
+function showMessage(text, duration = 2.0) {
+  messageCenter.textContent = text;
+  messageCenter.style.opacity = '1';
+  messageCenter.classList.add('fade-in');
+  state.messageTimer = duration;
+  state.beatMessageShown = true;
+}
+
+// ─────────────────────────────────────
+// BEAT MANAGER
+// ─────────────────────────────────────
+const beatData = [
+  { id: 0, name: '开场：击退', hint: '观察周围...' },
+  { id: 1, name: '教学：移动与拔剑', hint: '按 E 拾取地上的剑' },
+  { id: 2, name: '教学：基础攻击', hint: '鼠标左键攻击敌人' },
+  { id: 3, name: '教学：辉光斩', hint: '按 Q 释放技能' },
+  { id: 4, name: '教学：闪避', hint: '空格闪避·重甲兵接近中' },
+  { id: 5, name: '黑暗神降临', hint: 'Boss 战准备' },
+];
+
+function setBeat(id) {
+  if (id === state.beat) return;
+  state.beat = id;
+  const data = beatData[id];
+  beatDisplay.querySelector('.beat-name').textContent = `Beat ${id} · ${data.name}`;
+  beatDisplay.querySelector('.beat-hint').textContent = data.hint;
+  state.beatMessageShown = false;
+  state.messageTimer = 0;
+}
+
+function updateBeats() {
+  const playerPos = playerGroup.position.clone();
+
+  switch (state.beat) {
+    case 0:
+      // Show opening message
+      if (!state.beatMessageShown) {
+        showMessage('「站起来，愣着干嘛，你要给对面机会吗？」', 3.0);
+      }
+      // After message, auto-advance to beat 1
+      if (state.messageTimer <= 0 && state.beatMessageShown) {
+        setBeat(1);
+      }
+      break;
+
+    case 1:
+      if (!state.beatMessageShown) {
+        showMessage('拾取你的剑', 1.5);
+      }
+      // Check sword pickup
+      if (!state.hasSword) {
+        const swordPos = swordGroup.position;
+        const dist = playerPos.distanceTo(swordPos);
+        if (dist < 3) {
+          showMessage('按 E 拾取剑', 2.0);
+        }
+      }
+      if (state.hasSword && enemies.length === 0) {
+        // Spawn first wave
+        spawnEnemy(15, 0, 'minion');
+        spawnEnemy(10, 8, 'minion');
+        setBeat(2);
+      }
+      break;
+
+    case 2:
+      // Check if first wave defeated
+      if (enemies.filter(e => e.alive).length === 0 && state.enemiesDefeated >= 2) {
+        // Spawn second wave
+        spawnEnemy(-10, 5, 'minion');
+        spawnEnemy(8, -8, 'minion');
+        spawnEnemy(-5, -10, 'minion');
+        setBeat(3);
+      }
+      break;
+
+    case 3:
+      if (enemies.filter(e => e.alive).length === 0 && state.enemiesDefeated >= 5) {
+        spawnEnemy(0, -12, 'heavy');
+        setBeat(4);
+      }
+      break;
+
+    case 4:
+      if (enemies.filter(e => e.alive).length === 0 && state.enemiesDefeated >= 6) {
+        setBeat(5);
+        state.bossActive = true;
+        state.bossHP = state.bossMaxHP;
+        bossHud.style.display = 'flex';
+        showMessage('黑暗神降临...', 3.0);
+      }
+      break;
+
+    case 5:
+      // Boss battle
+      if (state.bossHP <= 0) {
+        showMessage('胜利...但代价是什么？', 4.0);
+        state.bossActive = false;
+        bossHud.style.display = 'none';
+        // Would transition to Beat 6+ but that's enough for the greybox
+      }
+      break;
+  }
+}
+
+// ─────────────────────────────────────
+// UPDATE
+// ─────────────────────────────────────
+const clock = new THREE.Clock();
+
+function update(dt) {
+  // Cap delta time
+  const clampedDt = Math.min(dt, 0.1);
+
+  // Update timers
+  if (state.attackTimer > 0) state.attackTimer -= clampedDt;
+  if (state.skillTimer > 0) state.skillTimer -= clampedDt;
+  if (state.dodgeCooldownTimer > 0) state.dodgeCooldownTimer -= clampedDt;
+  if (state.messageTimer > 0) state.messageTimer -= clampedDt;
+  if (state.messageTimer <= 0 && messageCenter.style.opacity === '1') {
+    messageCenter.style.opacity = '0';
+    messageCenter.classList.remove('fade-in');
+  }
+
+  // Attack animation
+  if (state.isAttacking) {
+    state.attackAnimTimer -= clampedDt;
+    if (state.attackAnimTimer <= 0) {
+      state.isAttacking = false;
+    }
+  }
+
+  // Dodge
+  if (state.isDodging) {
+    state.dodgeTimer -= clampedDt;
+    if (state.dodgeTimer <= 0) {
+      state.isDodging = false;
+    }
+  }
+
+  // Update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.userData.life -= clampedDt * 2;
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      particles.splice(i, 1);
+    } else {
+      p.position.x += p.userData.vel.x * clampedDt;
+      p.position.y += p.userData.vel.y * clampedDt;
+      p.position.z += p.userData.vel.z * clampedDt;
+      p.userData.vel.y -= 3 * clampedDt;
+      p.material.opacity = p.userData.life;
+    }
+  }
+
+  // ── CAMERA ────────────────────────
+  if (document.pointerLockElement === renderer.domElement) {
+    camTheta -= mouse.dx * 0.003;
+    camPhi -= mouse.dy * 0.003;
+    camPhi = Math.max(-0.1, Math.min(1.2, camPhi));
+    mouse.dx = 0;
+    mouse.dy = 0;
+  }
+
+  // Scroll zoom
+  camDistance = Math.max(5, Math.min(25, camDistance));
+
+  // Calculate camera position
+  const playerPos = playerGroup.position.clone();
+  const camTarget = new THREE.Vector3(playerPos.x, playerPos.y + 1.5, playerPos.z);
+
+  const camX = camTarget.x + Math.sin(camTheta) * Math.cos(camPhi) * camDistance;
+  const camY = camTarget.y + Math.sin(camPhi) * camDistance;
+  const camZ = camTarget.z + Math.cos(camTheta) * Math.cos(camPhi) * camDistance;
+
+  camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.08);
+  camera.lookAt(camTarget);
+
+  // ── PLAYER MOVEMENT ────────────────
+  const moveDir = new THREE.Vector3();
+  const camForward = new THREE.Vector3();
+  camera.getWorldDirection(camForward);
+  camForward.y = 0;
+  camForward.normalize();
+  const camRight = new THREE.Vector3();
+  camRight.crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+  if (keys['KeyW']) moveDir.add(camForward);
+  if (keys['KeyS']) moveDir.sub(camForward);
+  if (keys['KeyA']) moveDir.sub(camRight);
+  if (keys['KeyD']) moveDir.add(camRight);
+
+  if (moveDir.length() > 0) {
+    moveDir.normalize();
+
+    // Face movement direction
+    const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+    playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, targetAngle, 0.15);
+
+    const speed = state.isDodging ? DODGE_SPEED : PLAYER_SPEED;
+    const moveX = moveDir.x * speed * clampedDt;
+    const moveZ = moveDir.z * speed * clampedDt;
+
+    const newX = playerGroup.position.x + moveX;
+    const newZ = playerGroup.position.z + moveZ;
+
+    // Clamp to arena
+    const dist = Math.sqrt(newX * newX + newZ * newZ);
+    if (dist < ARENA_RADIUS - 0.5) {
+      playerGroup.position.x = newX;
+      playerGroup.position.z = newZ;
+    }
+  }
+
+  // ── INPUT ACTIONS ───────────────────
+  // Interact (pick up sword)
+  if (keys['KeyE'] && !state.hasSword) {
+    const swordDist = playerGroup.position.distanceTo(swordGroup.position);
+    if (swordDist < 3) {
+      state.hasSword = true;
+      scene.remove(swordGroup);
+      swordGroup.position.set(0.4, 1.3, 0.2);
+      swordGroup.rotation.set(0, 0, -0.15);
+      playerGroup.add(swordGroup);
+      flashScreen('#ffdd88', 0.2);
+      showMessage('剑已拾取', 1.5);
+    }
+  }
+
+  // Attack
+  if (mouse.buttons.has(0)) {
+    playerAttack();
+  }
+
+  // Skill
+  if (keys['KeyQ']) {
+    playerSkill();
+  }
+
+  // Dodge
+  if (keys['Space']) {
+    playerDodge();
+  }
+
+  // Lock-on toggle
+  if (keys['KeyR'] || mouse.buttons.has(2)) {
+    // Toggle boss lock
+    if (state.bossActive && state.isLockedOn === false) {
+      state.isLockedOn = true;
+      state.lockedTarget = bossGroup;
+    }
+  } else if (!keys['KeyR'] && !mouse.buttons.has(2)) {
+    state.isLockedOn = false;
+    state.lockedTarget = null;
+  }
+
+  // ── ENEMY AI ────────────────────────
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    const toPlayer = playerGroup.position.clone().sub(enemy.group.position);
+    toPlayer.y = 0;
+    const dist = toPlayer.length();
+
+    if (dist > 2.5) {
+      // Move toward player
+      toPlayer.normalize();
+      enemy.group.position.x += toPlayer.x * enemy.speed * clampedDt;
+      enemy.group.position.z += toPlayer.z * enemy.speed * clampedDt;
+      // Face player
+      enemy.group.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+    } else {
+      // Attack range
+      enemy.attackTimer -= clampedDt;
+      if (enemy.attackTimer <= 0 && !state.isDodging) {
+        enemy.attackTimer = enemy.attackCooldown;
+        state.playerHP -= enemy.damage;
+        flashScreen('#ff0000', 0.1);
+      }
+    }
+  }
+
+  // ── BOSS ────────────────────────────
+  if (state.bossActive) {
+    // Boss looks at player
+    bossGroup.lookAt(playerGroup.position.x, 1, playerGroup.position.z);
+
+    // Aura pulse
+    const pulse = 1 + Math.sin(clock.elapsedTime * 2) * 0.3;
+    aura.scale.setScalar(pulse);
+    aura.material.opacity = 0.3 + Math.sin(clock.elapsedTime * 2) * 0.15;
+  }
+
+  // ── HUD UPDATES ─────────────────────
+  state.playerHP = Math.max(0, Math.min(state.playerMaxHP, state.playerHP));
+  state.playerSP = Math.max(0, Math.min(state.playerMaxSP, state.playerSP));
+
+  // SP regen
+  state.playerSP = Math.min(state.playerMaxSP, state.playerSP + 3 * clampedDt);
+
+  hpFill.style.width = `${(state.playerHP / state.playerMaxHP) * 100}%`;
+  spFill.style.width = `${(state.playerSP / state.playerMaxSP) * 100}%`;
+
+  if (state.playerHP < 30) {
+    hpFill.style.background = '#ef4444';
+  } else {
+    hpFill.style.background = '#4ade80';
+  }
+
+  if (state.bossActive) {
+    bossBarFill.style.width = `${(state.bossHP / state.bossMaxHP) * 100}%`;
+  }
+
+  // ── BEAT UPDATES ────────────────────
+  updateBeats();
+
+  // ── DEATH CHECK ─────────────────────
+  if (state.playerHP <= 0) {
+    state.playerHP = state.playerMaxHP;
+    state.playerSP = state.playerMaxSP;
+    playerGroup.position.set(-3, 0.5, 2);
+    showMessage('再次尝试...', 1.5);
+  }
+
+  // Clean up consumed key states
+  keys['KeyE'] = false;
+  keys['KeyQ'] = false;
+  keys['Space'] = false;
+}
+
+// ─────────────────────────────────────
+// RENDER LOOP
+// ─────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  update(dt);
+  renderer.render(scene, camera);
+}
+
+// ─────────────────────────────────────
+// INIT
+// ─────────────────────────────────────
+// Position player lying on ground for Beat 0
+playerGroup.position.set(-3, 0.3, 2);
+// Tilt player slightly for "knocked down" effect
+body.rotation.x = Math.PI / 6;
+
+// Camera starts at dramatic angle
+camTheta = 1.2;
+camPhi = 0.4;
+camDistance = 10;
+
+// Initial beat message trigger
+setTimeout(() => {
+  if (state.beat === 0) {
+    body.rotation.x = 0; // Stand up after a moment
+    playerGroup.position.y = 0.5;
+  }
+}, 1500);
+
+showMessage('', 0);
+setBeat(0);
+state.beatMessageShown = false;
+
+// Start the loop
+animate();
+
+// ─────────────────────────────────────
+// SCROLL ZOOM
+// ─────────────────────────────────────
+window.addEventListener('wheel', (e) => {
+  camDistance += e.deltaY * 0.01;
+  camDistance = Math.max(5, Math.min(25, camDistance));
+}, { passive: true });
+
+console.log('%cProject Astra — Prologue Greybox %cReady',
+  'color:#ffdd88;font-size:14px;', 'color:#aaa;');
+console.log('Controls: WASD move | Mouse look | Left click attack | Q skill | Space dodge | E interact');
+console.log('Arena: 80m diameter | Beats: 0-5');
+</script>
+</body>
+</html>
