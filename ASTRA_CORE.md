@@ -3,7 +3,7 @@
 > **这是什么**：Project Astra 的压缩核心档案。任何 AI 智能体读取此文件后，应能理解游戏的灵魂、世界观、角色、玩法、剧情、当前进度，并接手续航开发。  
 > **写给谁看**：人类协作者 + AI 智能体（GPT、Claude、Gemini 等）  
 > **作者**：Darlingyyyy（人类）+ GameDesigner（WorkBuddy 游戏策划智能体）  
-> **版本**：v1.0 · 2026-06-01  
+> **版本**：v1.1 · 2026-06-02  
 > **仓库**：github.com/Darlingyyyy/Project-Astra
 
 ---
@@ -195,11 +195,11 @@ Demo 目标：
 ## 8. TECH_TARGET · 技术目标
 
 ```
-引擎建议：Unity URP + Cel Shading
+引擎确定：Unity 2022.3 LTS + URP + Cel Shading
 美术风格：Genshin Impact 路线 — 明亮·动画渲染·高饱和度
 关键词：温暖与忧郁并存·神树森林生机盎然但暗藏秘密·深渊冷色调扭曲
 
-渲染要求：Cel Shading / 后处理调色 / 动态光照
+渲染管线：URP + 自定义 Cel Shading 后处理
 UI：原神风格 HUD — 队伍头像左上角·技能栏右下角·小地图右上角
 平台：PC 首发，后续考虑移动端/主机
 多人：单机（非 MMO）
@@ -221,16 +221,17 @@ UI：原神风格 HUD — 队伍头像左上角·技能栏右下角·小地图�
   ✅ 新手村关卡设计
   ✅ 美术风格方向
   ✅ GitHub 仓库结构完整
+  ✅ 技术选型：Unity 2022.3 LTS + URP
+  ✅ Three.js 灰盒原型（手感验证用）
 
 待完成：
-  ⬜ 序章灰盒原型（Unity/Unreal）
+  ⬜ Unity 工程搭建 + 灰盒迁移
   ⬜ 数值表建立（战斗/经济/成长）
   ⬜ 冒险伙伴角色设计（3-5名）
   ⬜ 第一章详细节拍设计
   ⬜ 第二章及以后的大纲
   ⬜ 女主「最后一句话」内容确定
   ⬜ 概念美术：主角·女主·神树村
-  ⬜ 技术选型确认（Unity vs Unreal）
 ```
 
 ---
