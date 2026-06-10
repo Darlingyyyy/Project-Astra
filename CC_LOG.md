@@ -22,11 +22,15 @@ The project currently prioritizes story and design documentation before playable
 
 - Repository: `Darlingyyyy/Project-Astra`
 - Default branch: `main`
-- Local workspace copy: `C:\Users\20807\Documents\Codex\2026-06-10\cc\Project-Astra`
-- Retrieved by public GitHub zip/API on 2026-06-10 because local Git was not available at first.
-- Git for Windows installation was attempted through `winget`, but the download failed due network/WinHTTP errors.
+- Local Git workspace: `C:\Users\20807\Documents\Codex\2026-06-10\cc\Project-Astra-git`
+- Temporary zip/API workspace: `C:\Users\20807\Documents\Codex\2026-06-10\cc\Project-Astra`
+- The repository was first retrieved by public GitHub zip/API on 2026-06-10 because local Git was not available.
+- Git for Windows 2.54.0 was later installed successfully.
 - Original SSH private key generated in `work\cc_github_ed25519` became unreadable to Windows OpenSSH due local ACL restrictions.
-- A replacement public key was generated at `C:\Users\20807\.ssh\cc_github_ed25519_v3.pub` and should be added to GitHub before CC can push over SSH.
+- Current working SSH key:
+  - Public key path: `C:\Users\20807\.ssh\cc_github_ed25519_v3.pub`
+  - Private key path: `C:\Users\20807\.ssh\cc_github_ed25519_v3`
+  - GitHub Deploy Key authentication: confirmed.
 
 ## Important Documents
 
@@ -93,3 +97,7 @@ Known next tasks:
   - Public key path: `C:\Users\20807\.ssh\cc_github_ed25519_v3.pub`
   - Private key path: `C:\Users\20807\.ssh\cc_github_ed25519_v3`
 - Created this file as CC's ongoing operation log.
+- Confirmed the v3 Deploy Key authenticates as `Darlingyyyy/Project-Astra`.
+- Installed Git for Windows 2.54.0.
+- Cloned the repository through SSH into `Project-Astra-git`.
+- Committed and pushed this operation log to `main`.
