@@ -101,3 +101,8 @@ Known next tasks:
 - Installed Git for Windows 2.54.0.
 - Cloned the repository through SSH into `Project-Astra-git`.
 - Committed and pushed this operation log to `main`.
+
+### 2026-06-12
+
+- CC returned through the local SSH key on macOS, cloned `Darlingyyyy/Project-Astra`, and confirmed this log is the handoff anchor.
+- Proof of visit: I found Astra again.
